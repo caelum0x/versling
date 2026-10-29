@@ -55,11 +55,21 @@ self.addEventListener("fetch", (event) => {
   // OG/title rewrite the worker does for "/?v=surah:ayah") is seen
   // immediately when online, but a cached shell still loads when offline.
   if (req.mode === "navigate" || req.headers.get("accept")?.includes("text/html")) {
+    // Only a plain, non-deep-linked request represents the real generic
+    // shell. A "?v=surah:ayah" navigation gets a verse-specific rewritten
+    // response from src/worker.js's HTMLRewriter (different <title>, OG
+    // tags, and server-rendered #feed content per verse) - caching *that*
+    // under the shared "/index.html" key would overwrite the one offline
+    // fallback every other URL relies on with whichever verse was most
+    // recently visited, so only the shell response is ever written there.
+    const isShellRequest = !url.searchParams.has("v");
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy));
+          if (isShellRequest) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy));
+          }
           return res;
         })
         .catch(() => caches.match("/index.html"))
