@@ -114,6 +114,12 @@
     return data;
   }
 
+  async function fetchJsonOrThrow(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to load ${url} (status ${res.status})`);
+    return res.json();
+  }
+
   function surahInfo(num) {
     return surahMeta[num - 1];
   }
@@ -588,35 +594,59 @@
   });
 
   // ---- Boot ----
+  // Every fetch in here (metadata + the initial seedFeed pages) can reject on
+  // a dropped connection, a transient 5xx, or a bad JSON body — with no
+  // try/catch, that leaves #feed permanently empty (just the static topbar on
+  // a black screen) with zero indication anything went wrong and no way to
+  // recover short of knowing to manually reload. Real users on a flaky
+  // mobile connection would see a blank app forever. Catch it and offer a
+  // real retry instead.
+  function showBootError() {
+    feedEl.innerHTML = `
+      <div class="boot-error">
+        <p>Couldn't load the Quran. Check your connection and try again.</p>
+        <button id="boot-retry" type="button" class="btn-primary">Retry</button>
+      </div>`;
+    document.getElementById("boot-retry").addEventListener("click", () => {
+      feedEl.innerHTML = "";
+      boot();
+    });
+  }
+
   async function boot() {
-    const [surahsRes, indexRes] = await Promise.all([
-      fetch("/data/surahs.json").then(r => r.json()),
-      fetch("/data/index.json").then(r => r.json()),
-    ]);
-    surahMeta = surahsRes;
-    totalVerses = indexRes.totalVerses;
-    let running = 0;
-    cumulative = indexRes.surahs.map(s => { running += s.count; return running; });
+    try {
+      const [surahsRes, indexRes] = await Promise.all([
+        fetchJsonOrThrow("/data/surahs.json"),
+        fetchJsonOrThrow("/data/index.json"),
+      ]);
+      surahMeta = surahsRes;
+      totalVerses = indexRes.totalVerses;
+      let running = 0;
+      cumulative = indexRes.surahs.map(s => { running += s.count; return running; });
 
-    renderSurahList();
-    renderOnboarding();
+      renderSurahList();
+      renderOnboarding();
 
-    const sharedRef = parseVerseRef(new URLSearchParams(location.search).get("v"));
-    let startGi;
-    if (sharedRef) {
-      await loadSurah(sharedRef.surah);
-      startGi = giFromSurahAyah(sharedRef.surah, sharedRef.ayah);
-      toast(`Opened ${surahInfo(sharedRef.surah).nameEnglish} ${sharedRef.surah}:${sharedRef.ayah}`);
-    } else {
-      const savedPos = parseInt(localStorage.getItem(LS_POSITION) || "0", 10);
-      startGi = Number.isFinite(savedPos) ? savedPos : 0;
-    }
-    await seedFeed(startGi);
+      const sharedRef = parseVerseRef(new URLSearchParams(location.search).get("v"));
+      let startGi;
+      if (sharedRef) {
+        await loadSurah(sharedRef.surah);
+        startGi = giFromSurahAyah(sharedRef.surah, sharedRef.ayah);
+        toast(`Opened ${surahInfo(sharedRef.surah).nameEnglish} ${sharedRef.surah}:${sharedRef.ayah}`);
+      } else {
+        const savedPos = parseInt(localStorage.getItem(LS_POSITION) || "0", 10);
+        startGi = Number.isFinite(savedPos) ? savedPos : 0;
+      }
+      await seedFeed(startGi);
 
-    // a shared link should always show onboarding too, same as a fresh visit —
-    // don't let a deep link silently skip the explainer for a brand-new user
-    if (!localStorage.getItem(LS_ONBOARDED)) {
-      onboardEl.hidden = false;
+      // a shared link should always show onboarding too, same as a fresh visit —
+      // don't let a deep link silently skip the explainer for a brand-new user
+      if (!localStorage.getItem(LS_ONBOARDED)) {
+        onboardEl.hidden = false;
+      }
+    } catch (err) {
+      console.error("Versling: failed to start", err);
+      showBootError();
     }
   }
 
