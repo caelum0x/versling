@@ -57,7 +57,7 @@
     catch { return new Set(); }
   }
   function saveLikes(set) {
-    lsSet(LS_LIKES, JSON.stringify([...set]));
+    return lsSet(LS_LIKES, JSON.stringify([...set]));
   }
 
   // ---- global index <-> (surah, ayah) ----
@@ -184,9 +184,19 @@
       e.stopPropagation();
       const key = `${verse.surah}:${verse.ayah}`;
       const likes = getLikes();
-      if (likes.has(key)) { likes.delete(key); toast("Removed from saved"); } else { likes.add(key); toast("Saved"); }
-      saveLikes(likes);
-      setLikeBtnState(e.currentTarget, likes.has(key));
+      const wasLiked = likes.has(key);
+      if (wasLiked) { likes.delete(key); } else { likes.add(key); }
+      const ok = saveLikes(likes);
+      if (ok) {
+        toast(wasLiked ? "Removed from saved" : "Saved");
+        setLikeBtnState(e.currentTarget, !wasLiked);
+      } else {
+        // Write failed (e.g. QuotaExceededError/private-mode/blocked
+        // storage) -- don't claim success. Leave the button/state exactly
+        // as it was before the click instead of lying about persistence.
+        toast("Couldn't save -- storage is full or blocked");
+        setLikeBtnState(e.currentTarget, wasLiked);
+      }
     });
     el.querySelector(".act-expand").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -619,7 +629,13 @@
     if (e.target.closest(".saved-item-remove")) {
       const likes = getLikes();
       likes.delete(`${surah}:${ayah}`);
-      saveLikes(likes);
+      const ok = saveLikes(likes);
+      if (!ok) {
+        // Write failed -- the item is still really saved in storage, so
+        // don't desync the feed's heart icon or drop it from this list.
+        toast("Couldn't remove -- storage is full or blocked");
+        return;
+      }
       rendered.forEach((r) => {
         if (parseInt(r.el.dataset.surah, 10) === surah && parseInt(r.el.dataset.ayah, 10) === ayah) {
           setLikeBtnState(r.el.querySelector(".act-like"), false);
