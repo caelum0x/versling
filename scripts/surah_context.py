@@ -8,7 +8,7 @@ CONTEXT = {
 2: "The longest surah; lays out law, worship, patience and the stories of earlier prophets for the new Medinan community.",
 3: "Continues themes from Al-Baqarah, centers on the family of Imran and discussions with Christians and Jews after the Battle of Badr.",
 4: "Lays out rules for family life, inheritance, and justice, named for its emphasis on the rights of women.",
-5: "The last major legal surah revealed, includes the story of the Last Supper-like table and completes core rulings.",
+5: "The last major legal surah revealed; sets out dietary and ritual law, recounts the disciples asking Jesus for a table of food sent down from heaven as a sign, and declares the faith complete.",
 6: "A sweeping Meccan surah arguing for God's oneness through nature, reason and the fate of earlier nations.",
 7: "Recounts the stories of Adam, Noah, and several prophets rejected by their peoples, warning Mecca of a similar fate.",
 8: "Reflects on the Battle of Badr, the first major victory of the early Muslim community, and the ethics of war.",
