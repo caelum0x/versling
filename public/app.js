@@ -5,6 +5,25 @@
   const LS_POSITION = "versling_position_v1";
   const LS_LIKES = "versling_likes_v1";
 
+  // localStorage.setItem/getItem can throw for real reasons that have
+  // nothing to do with this app's logic: Safari private-mode quota, an
+  // enterprise/MDM storage policy, a strict in-app browser (the exact kind
+  // of WebView the app's own share feature sends people into), or storage
+  // just being full. Every call site used to call localStorage directly, so
+  // one throw inside the onboarding "Continue" handler left the overlay
+  // permanently stuck open (confirmed live: #feed stays `inert` forever,
+  // the whole app is unusable) and a throw inside the scroll observer
+  // silently stopped position tracking + infinite-scroll growth for that
+  // event. These wrappers make storage failures degrade gracefully instead.
+  function lsGet(key) {
+    try { return localStorage.getItem(key); }
+    catch { return null; }
+  }
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, value); return true; }
+    catch { return false; }
+  }
+
   const topbarEl = document.getElementById("topbar");
   const feedEl = document.getElementById("feed");
   const pageTpl = document.getElementById("tpl-page");
@@ -34,11 +53,11 @@
   }
 
   function getLikes() {
-    try { return new Set(JSON.parse(localStorage.getItem(LS_LIKES) || "[]")); }
+    try { return new Set(JSON.parse(lsGet(LS_LIKES) || "[]")); }
     catch { return new Set(); }
   }
   function saveLikes(set) {
-    localStorage.setItem(LS_LIKES, JSON.stringify([...set]));
+    lsSet(LS_LIKES, JSON.stringify([...set]));
   }
 
   // ---- global index <-> (surah, ayah) ----
@@ -301,7 +320,7 @@
     entries.forEach(entry => {
       if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
         currentGi = parseInt(entry.target.dataset.gi, 10);
-        localStorage.setItem(LS_POSITION, String(currentGi));
+        lsSet(LS_POSITION, String(currentGi));
         updateUrlForGi(currentGi);
         maybeGrow();
         maybeGrowBack();
@@ -671,7 +690,7 @@
     if (idx < ONBOARD_SLIDES.length - 1) {
       slidesEl.scrollTo({ left: slidesEl.clientWidth * (idx + 1), behavior: "smooth" });
     } else {
-      localStorage.setItem(LS_ONBOARDED, "1");
+      lsSet(LS_ONBOARDED, "1");
       onboardEl.hidden = true;
       popOverlay();
     }
@@ -718,14 +737,14 @@
         startGi = giFromSurahAyah(sharedRef.surah, sharedRef.ayah);
         toast(`Opened ${surahInfo(sharedRef.surah).nameEnglish} ${sharedRef.surah}:${sharedRef.ayah}`);
       } else {
-        const savedPos = parseInt(localStorage.getItem(LS_POSITION) || "0", 10);
+        const savedPos = parseInt(lsGet(LS_POSITION) || "0", 10);
         startGi = Number.isFinite(savedPos) ? savedPos : 0;
       }
       await seedFeed(startGi);
 
       // a shared link should always show onboarding too, same as a fresh visit —
       // don't let a deep link silently skip the explainer for a brand-new user
-      if (!localStorage.getItem(LS_ONBOARDED)) {
+      if (!lsGet(LS_ONBOARDED)) {
         onboardEl.hidden = false;
         pushOverlay(onboardEl);
       }
