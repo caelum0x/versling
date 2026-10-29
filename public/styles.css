@@ -26,6 +26,7 @@ a:hover{text-decoration:underline;}
 }
 #topbar .icon-btn{pointer-events:auto;}
 #brand{font-weight:700;letter-spacing:.04em;font-size:15px;color:var(--text);opacity:.92;pointer-events:auto;}
+.topbar-right{display:flex;gap:8px;pointer-events:auto;}
 
 .icon-btn{
   background:rgba(20,20,20,.55);border:1px solid var(--border);color:var(--text);
@@ -145,6 +146,17 @@ a:hover{text-decoration:underline;}
 .surah-en{font-weight:600;font-size:15px;}
 .surah-meaning{font-size:12px;color:var(--text-dim);}
 .surah-ar{font-family:'Amiri',serif;font-size:17px;color:var(--text-dim);}
+
+.saved-list{display:flex;flex-direction:column;}
+.saved-item{display:flex;align-items:flex-start;gap:8px;border-bottom:1px solid var(--border);}
+.saved-item-main{flex:1;background:none;border:none;color:var(--text);text-align:left;cursor:pointer;
+  padding:13px 4px;font-family:inherit;}
+.saved-item-main:active{background:var(--bg-raised);}
+.saved-item-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;font-weight:600;}
+.saved-item-text{font-size:14px;line-height:1.5;color:var(--text);margin:0;opacity:.92;}
+.saved-item-remove{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:13px 6px;flex-shrink:0;}
+.saved-item-remove:active{transform:scale(.9);color:var(--text);}
+.saved-empty{color:var(--text-dim);font-size:13px;padding:20px 4px;text-align:center;}
 
 #info p{font-size:14px;line-height:1.65;color:var(--text);margin:0 0 12px;}
 #info .muted{color:var(--text-dim);font-size:12px;}

@@ -10,6 +10,8 @@
 
   const detailEl = document.getElementById("detail");
   const surahsEl = document.getElementById("surahs");
+  const savedEl = document.getElementById("saved");
+  const savedListEl = document.getElementById("saved-list");
   const infoEl = document.getElementById("info");
   const toastEl = document.getElementById("toast");
 
@@ -424,6 +426,73 @@
     openSheet(surahsEl);
   });
   document.getElementById("btn-info").addEventListener("click", () => openSheet(infoEl));
+
+  // ---- Saved verses ----
+  function savedItemHtml(p, v, info) {
+    return `
+      <div class="saved-item" data-surah="${p.surah}" data-ayah="${p.ayah}">
+        <button class="saved-item-main" type="button">
+          <div class="saved-item-tag">${escapeHtml(info.nameEnglish)} ${p.surah}:${p.ayah}</div>
+          <p class="saved-item-text">${escapeHtml(truncate(v.translation, 140))}</p>
+        </button>
+        <button class="saved-item-remove" type="button" aria-label="Remove from saved" title="Remove from saved">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+        </button>
+      </div>`;
+  }
+
+  async function renderSavedList() {
+    const keys = [...getLikes()];
+    if (!keys.length) {
+      savedListEl.innerHTML = `<p class="saved-empty">No saved verses yet. Tap the heart on any verse to save it here.</p>`;
+      return;
+    }
+    savedListEl.innerHTML = `<p class="surah-loading">Loading saved verses...</p>`;
+    const parsed = keys
+      .map((k) => {
+        const [s, a] = k.split(":").map((n) => parseInt(n, 10));
+        return { surah: s, ayah: a };
+      })
+      .filter((p) => surahInfo(p.surah) && Number.isFinite(p.ayah))
+      .sort((x, y) => giFromSurahAyah(x.surah, x.ayah) - giFromSurahAyah(y.surah, y.ayah));
+    const surahNums = [...new Set(parsed.map((p) => p.surah))];
+    await Promise.all(surahNums.map((n) => loadSurah(n)));
+    const html = parsed
+      .map((p) => {
+        const verses = surahCache.get(p.surah) || [];
+        const v = verses[p.ayah - 1];
+        const info = surahInfo(p.surah);
+        return v && info ? savedItemHtml(p, v, info) : "";
+      })
+      .join("");
+    savedListEl.innerHTML = html || `<p class="saved-empty">No saved verses yet. Tap the heart on any verse to save it here.</p>`;
+  }
+
+  savedListEl.addEventListener("click", (e) => {
+    const item = e.target.closest(".saved-item");
+    if (!item) return;
+    const surah = parseInt(item.dataset.surah, 10);
+    const ayah = parseInt(item.dataset.ayah, 10);
+    if (e.target.closest(".saved-item-remove")) {
+      const likes = getLikes();
+      likes.delete(`${surah}:${ayah}`);
+      saveLikes(likes);
+      rendered.forEach((r) => {
+        if (parseInt(r.el.dataset.surah, 10) === surah && parseInt(r.el.dataset.ayah, 10) === ayah) {
+          r.el.querySelector(".act-like").classList.remove("active");
+        }
+      });
+      renderSavedList();
+      return;
+    }
+    closeSheet(savedEl);
+    jumpToVerse(surah, ayah);
+  });
+
+  document.getElementById("btn-saved").addEventListener("click", () => {
+    renderSavedList();
+    openSheet(savedEl);
+  });
 
   // ---- Onboarding ----
   const ONBOARD_SLIDES = [

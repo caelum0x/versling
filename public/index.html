@@ -20,9 +20,14 @@
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h11" stroke-linecap="round"/></svg>
     </button>
     <div id="brand">Versling</div>
-    <button id="btn-info" class="icon-btn" aria-label="About and sources" title="About and sources">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 11h1v5h1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
+    <div class="topbar-right">
+      <button id="btn-saved" class="icon-btn" aria-label="Saved verses" title="Saved verses">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20s-7-4.4-9.5-9.1C.8 7.6 2.3 4 5.8 4c2 0 3.3 1 4.2 2.4C11 5 12.2 4 14.2 4c3.5 0 5 3.6 3.3 6.9C19 15.6 12 20 12 20z" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="btn-info" class="icon-btn" aria-label="About and sources" title="About and sources">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 11h1v5h1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
   </header>
 
   <main id="feed" aria-live="polite"></main>
@@ -93,6 +98,16 @@
           <span class="more-texts-desc">The Torah, one verse at a time</span>
         </a>
       </div>
+    </div>
+  </div>
+
+  <div id="saved" class="sheet" hidden>
+    <div class="sheet-inner">
+      <button class="sheet-close icon-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+      <h2 class="sheet-title">Saved verses</h2>
+      <div id="saved-list" class="saved-list"></div>
     </div>
   </div>
 
