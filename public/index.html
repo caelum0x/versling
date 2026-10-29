@@ -64,7 +64,7 @@
     </section>
   </template>
 
-  <div id="detail" class="sheet" hidden>
+  <div id="detail" class="sheet" hidden role="dialog" aria-modal="true" aria-label="Verse detail">
     <div class="sheet-inner">
       <button class="sheet-close icon-btn" aria-label="Close">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
@@ -85,7 +85,7 @@
     </div>
   </div>
 
-  <div id="surahs" class="sheet" hidden>
+  <div id="surahs" class="sheet" hidden role="dialog" aria-modal="true" aria-label="Browse surahs">
     <div class="sheet-inner">
       <button class="sheet-close icon-btn" aria-label="Close">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
@@ -113,7 +113,7 @@
     </div>
   </div>
 
-  <div id="saved" class="sheet" hidden>
+  <div id="saved" class="sheet" hidden role="dialog" aria-modal="true" aria-label="Saved verses">
     <div class="sheet-inner">
       <button class="sheet-close icon-btn" aria-label="Close">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
@@ -123,7 +123,7 @@
     </div>
   </div>
 
-  <div id="info" class="sheet" hidden>
+  <div id="info" class="sheet" hidden role="dialog" aria-modal="true" aria-label="About and sources">
     <div class="sheet-inner">
       <button class="sheet-close icon-btn" aria-label="Close">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
@@ -140,7 +140,7 @@
     </div>
   </div>
 
-  <div id="onboarding" class="onboard" hidden>
+  <div id="onboarding" class="onboard" hidden role="dialog" aria-modal="true" aria-label="Welcome to Versling">
     <div class="onboard-slides" id="onboard-slides"></div>
     <div class="onboard-dots" id="onboard-dots"></div>
     <button id="onboard-next" class="btn-primary">Continue</button>

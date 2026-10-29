@@ -5,6 +5,7 @@
   const LS_POSITION = "versling_position_v1";
   const LS_LIKES = "versling_likes_v1";
 
+  const topbarEl = document.getElementById("topbar");
   const feedEl = document.getElementById("feed");
   const pageTpl = document.getElementById("tpl-page");
 
@@ -204,8 +205,79 @@
     openSheet(detailEl);
   }
 
-  function openSheet(el) { el.hidden = false; }
-  function closeSheet(el) { el.hidden = true; }
+  // ---- Overlay/modal focus + keyboard containment ----
+  // Every sheet and the onboarding screen are visually full-screen overlays
+  // (CSS z-index + opaque backdrop), but before this fix nothing stopped a
+  // keyboard user from Tab-ing straight through the topbar and feed buttons
+  // sitting *underneath* an open overlay — those elements stayed in normal
+  // DOM tab order and fully clickable via Enter/Space even while visually
+  // hidden behind the sheet, and Escape did nothing, and opening a sheet
+  // never moved focus into it (so a screen reader never even announced it
+  // opened). `inert` removes the topbar+feed from the accessibility tree and
+  // tab order for as long as any overlay is open, restoring real modal
+  // behavior to match what already looked true visually.
+  let openOverlays = 0;
+  let lastFocusedEl = null;
+
+  function focusableIn(container) {
+    return [...container.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )].filter((el) => !el.disabled && !el.hidden);
+  }
+
+  function pushOverlay(container) {
+    openOverlays += 1;
+    topbarEl.inert = true;
+    feedEl.inert = true;
+    lastFocusedEl = document.activeElement;
+    const target = focusableIn(container)[0] || container;
+    target.focus({ preventScroll: true });
+  }
+
+  function popOverlay() {
+    openOverlays = Math.max(0, openOverlays - 1);
+    if (openOverlays === 0) {
+      topbarEl.inert = false;
+      feedEl.inert = false;
+    }
+    if (lastFocusedEl && document.body.contains(lastFocusedEl)) {
+      lastFocusedEl.focus({ preventScroll: true });
+    }
+    lastFocusedEl = null;
+  }
+
+  function topmostOpenOverlay() {
+    return document.querySelector(".sheet:not([hidden])") ||
+      (onboardEl && !onboardEl.hidden ? onboardEl : null);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const overlay = topmostOpenOverlay();
+    if (!overlay) return;
+    if (e.key === "Escape") {
+      if (overlay.classList.contains("sheet")) {
+        e.preventDefault();
+        closeSheet(overlay);
+      }
+      return; // onboarding has no Escape dismiss — it must be stepped through
+    }
+    if (e.key === "Tab") {
+      const focusable = focusableIn(overlay);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
+  function openSheet(el) { el.hidden = false; pushOverlay(el); }
+  function closeSheet(el) { el.hidden = true; popOverlay(); }
   document.querySelectorAll(".sheet .sheet-close").forEach(btn => {
     btn.addEventListener("click", () => closeSheet(btn.closest(".sheet")));
   });
@@ -590,6 +662,7 @@
     } else {
       localStorage.setItem(LS_ONBOARDED, "1");
       onboardEl.hidden = true;
+      popOverlay();
     }
   });
 
@@ -643,6 +716,7 @@
       // don't let a deep link silently skip the explainer for a brand-new user
       if (!localStorage.getItem(LS_ONBOARDED)) {
         onboardEl.hidden = false;
+        pushOverlay(onboardEl);
       }
     } catch (err) {
       console.error("Versling: failed to start", err);
