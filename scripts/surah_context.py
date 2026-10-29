@@ -37,7 +37,7 @@ CONTEXT = {
 31: "Named after a wise, non-prophetic figure whose advice to his son models humility and gratitude.",
 32: "A short surah on the Day of Judgment, contrasting the fate of the devoted and the arrogant.",
 33: "Addresses events around the Battle of the Trench and sets out norms for the Prophet's household and community.",
-34: "Named after David, recounts the favors shown to David and Solomon and warns against taking blessings for granted.",
+34: "Named for the Sheba (Saba) people, whose prosperous kingdom collapsed through ingratitude when their great dam broke; also recounts the favors shown to David and Solomon.",
 35: "Called 'The Originator', reflects on God as creator and sustainer of the natural order.",
 36: "Often recited for the dying or departed, affirms resurrection and the Quran's message through vivid imagery.",
 37: "Describes ranks of angels in worship and retells the stories of Noah, Abraham, and Jonah as examples of faith.",
