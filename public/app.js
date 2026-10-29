@@ -480,12 +480,19 @@
     });
   }
 
+  // A transient failure (one dropped surah-N.json fetch out of 114 — a
+  // flaky mobile network, a transient 5xx) must not permanently wedge
+  // full-text search for the rest of the session. Without resetting
+  // `allSurahsLoading` on failure, the `if (!allSurahsLoading)` guard above
+  // would keep re-awaiting the same already-rejected promise on every
+  // future search, throwing again every time with no way to recover short
+  // of a full page reload.
   async function ensureAllSurahsLoaded() {
     if (allSurahsLoaded) return;
     if (!allSurahsLoading) {
-      allSurahsLoading = Promise.all(surahMeta.map(s => loadSurah(s.number))).then(() => {
-        allSurahsLoaded = true;
-      });
+      allSurahsLoading = Promise.all(surahMeta.map(s => loadSurah(s.number)))
+        .then(() => { allSurahsLoaded = true; })
+        .catch((err) => { allSurahsLoading = null; throw err; });
     }
     await allSurahsLoading;
   }
@@ -520,7 +527,20 @@
       (surahMatches.length ? surahMatches.map(surahMatchHtml).join("") : "") +
       `<p class="surah-loading">Searching all 6,236 verses...</p>`;
 
-    await ensureAllSurahsLoaded();
+    try {
+      await ensureAllSurahsLoaded();
+    } catch (err) {
+      console.error("Versling: failed to load verses for search", err);
+      if (token !== searchToken) return; // a newer search started while we were loading
+      // Fall back to surah-only results instead of leaving "Searching..."
+      // on screen forever — the next keystroke/retry calls
+      // ensureAllSurahsLoaded again and can succeed once the network recovers.
+      surahResultsEl.innerHTML = surahMatches.length
+        ? surahMatches.map(surahMatchHtml).join("") +
+          `<p class="surah-empty">Couldn't search all verses — check your connection and try again.</p>`
+        : `<p class="surah-empty">Couldn't search — check your connection and try again.</p>`;
+      return;
+    }
     if (token !== searchToken) return; // a newer search started while we were loading
 
     const verseMatches = [];
