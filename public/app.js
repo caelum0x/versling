@@ -108,6 +108,7 @@
   async function loadSurah(num) {
     if (surahCache.has(num)) return surahCache.get(num);
     const res = await fetch(`/data/surah-${num}.json`);
+    if (!res.ok) throw new Error(`Failed to load surah ${num} (status ${res.status})`);
     const data = await res.json();
     surahCache.set(num, data);
     return data;
@@ -238,15 +239,28 @@
     feedEl.scrollTop = prevScrollTop + el.getBoundingClientRect().height;
   }
 
+  // Both of these must always reset loadingMore, even on failure (a dropped
+  // request from a flaky mobile connection, a transient 5xx, etc.) — without
+  // a finally block here, a single failed fetch inside appendPage/prependPage
+  // leaves loadingMore stuck true forever, permanently stopping the feed from
+  // growing in either direction for the rest of the session (only a full
+  // page reload would recover). Resetting the flag lets the very next
+  // intersection event retry the same page automatically.
   async function maybeGrow() {
     if (loadingMore) return;
     const last = rendered[rendered.length - 1];
     if (!last) return;
     if (last.gi - currentGi < 4) {
       loadingMore = true;
-      const next = last.gi + 1;
-      await appendPage(next);
-      loadingMore = false;
+      try {
+        const next = last.gi + 1;
+        await appendPage(next);
+      } catch (err) {
+        console.error("Versling: failed to load the next verse", err);
+        toast("Couldn't load more — check your connection");
+      } finally {
+        loadingMore = false;
+      }
     }
   }
 
@@ -256,9 +270,15 @@
     if (!first) return;
     if (currentGi - first.gi < 4) {
       loadingMore = true;
-      const prev = first.gi - 1;
-      await prependPage(prev);
-      loadingMore = false;
+      try {
+        const prev = first.gi - 1;
+        await prependPage(prev);
+      } catch (err) {
+        console.error("Versling: failed to load the previous verse", err);
+        toast("Couldn't load more — check your connection");
+      } finally {
+        loadingMore = false;
+      }
     }
   }
 
