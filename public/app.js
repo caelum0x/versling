@@ -1,0 +1,473 @@
+(() => {
+  "use strict";
+
+  const LS_ONBOARDED = "versling_onboarded_v1";
+  const LS_POSITION = "versling_position_v1";
+  const LS_LIKES = "versling_likes_v1";
+
+  const feedEl = document.getElementById("feed");
+  const pageTpl = document.getElementById("tpl-page");
+
+  const detailEl = document.getElementById("detail");
+  const surahsEl = document.getElementById("surahs");
+  const infoEl = document.getElementById("info");
+  const toastEl = document.getElementById("toast");
+
+  let surahMeta = [];        // from surahs.json
+  let cumulative = [];       // cumulative verse counts, cumulative[i] = verses before surah i+1
+  let totalVerses = 0;
+  let surahCache = new Map(); // surahNumber -> array of verse objects
+  let rendered = [];          // array of { gi, el, surah, ayah }
+  let currentGi = 0;
+  let loadingMore = false;
+  let allSurahsLoaded = false;
+  let allSurahsLoading = null;
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(() => { toastEl.hidden = true; }, 1800);
+  }
+
+  function getLikes() {
+    try { return new Set(JSON.parse(localStorage.getItem(LS_LIKES) || "[]")); }
+    catch { return new Set(); }
+  }
+  function saveLikes(set) {
+    localStorage.setItem(LS_LIKES, JSON.stringify([...set]));
+  }
+
+  // ---- global index <-> (surah, ayah) ----
+  function giToSurahAyah(gi) {
+    gi = ((gi % totalVerses) + totalVerses) % totalVerses; // wrap
+    let lo = 0, hi = cumulative.length - 1;
+    // cumulative[i] = total verses in surahs 1..i (1-indexed by position, surah i+1)
+    for (let i = 0; i < cumulative.length; i++) {
+      if (gi < cumulative[i]) {
+        const surahNum = i + 1;
+        const prev = i === 0 ? 0 : cumulative[i - 1];
+        const ayah = gi - prev + 1;
+        return { surah: surahNum, ayah };
+      }
+    }
+    return { surah: 1, ayah: 1 };
+  }
+
+  function giFromSurahAyah(surah, ayah) {
+    const prev = surah === 1 ? 0 : cumulative[surah - 2];
+    return prev + (ayah - 1);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+  function truncate(s, n) {
+    return s.length > n ? s.slice(0, n).trim() + "…" : s;
+  }
+
+  async function loadSurah(num) {
+    if (surahCache.has(num)) return surahCache.get(num);
+    const res = await fetch(`/data/surah-${num}.json`);
+    const data = await res.json();
+    surahCache.set(num, data);
+    return data;
+  }
+
+  function surahInfo(num) {
+    return surahMeta[num - 1];
+  }
+
+  function fillPage(el, gi, verse) {
+    const info = surahInfo(verse.surah);
+    el.dataset.gi = gi;
+    el.dataset.surah = verse.surah;
+    el.dataset.ayah = verse.ayah;
+    el.querySelector(".verse-ref").textContent = `${info.nameEnglish} ${verse.surah}:${verse.ayah}`;
+    el.querySelector(".verse-arabic").textContent = verse.arabic;
+    el.querySelector(".verse-translation").textContent = verse.translation;
+    const likeBtn = el.querySelector(".act-like");
+    const likes = getLikes();
+    likeBtn.classList.toggle("active", likes.has(`${verse.surah}:${verse.ayah}`));
+  }
+
+  async function buildPage(gi) {
+    const { surah, ayah } = giToSurahAyah(gi);
+    const verses = await loadSurah(surah);
+    const verse = verses[ayah - 1];
+    const frag = pageTpl.content.cloneNode(true);
+    const el = frag.querySelector(".verse-page");
+    fillPage(el, gi, verse);
+    wirePageActions(el, verse);
+    return el;
+  }
+
+  function wirePageActions(el, verse) {
+    el.querySelector(".act-like").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const key = `${verse.surah}:${verse.ayah}`;
+      const likes = getLikes();
+      if (likes.has(key)) { likes.delete(key); } else { likes.add(key); toast("Saved"); }
+      saveLikes(likes);
+      e.currentTarget.classList.toggle("active", likes.has(key));
+    });
+    el.querySelector(".act-expand").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openDetail(verse);
+    });
+    el.querySelector(".act-share").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const info = surahInfo(verse.surah);
+      const text = `${verse.arabic}\n\n"${verse.translation}"\n— Quran ${info.nameEnglish} ${verse.surah}:${verse.ayah}\n\nvia Versling`;
+      if (navigator.share) {
+        try { await navigator.share({ text }); } catch {}
+      } else {
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("Copied to clipboard");
+        } catch { toast("Could not copy"); }
+      }
+    });
+    el.addEventListener("click", () => openDetail(verse));
+  }
+
+  function openDetail(verse) {
+    const info = surahInfo(verse.surah);
+    detailEl.querySelector(".sheet-ref").textContent = `Quran ${verse.surah}:${verse.ayah}`;
+    detailEl.querySelector(".sheet-surah").textContent = `${info.nameEnglish} — ${info.meaning} (${info.revelationType})`;
+    detailEl.querySelector(".sheet-context").textContent = info.context;
+    detailEl.querySelector(".sheet-arabic").textContent = verse.arabic;
+    detailEl.querySelector(".sheet-translit").textContent = verse.transliteration;
+    detailEl.querySelector(".sheet-translation").textContent = `"${verse.translation}"`;
+    detailEl.querySelector(".sheet-source").innerHTML =
+      `Arabic: Tanzil Project, CC BY 3.0 — <a href="https://tanzil.net" target="_blank" rel="noopener">tanzil.net</a>. ` +
+      `Translation: M. M. Pickthall (1930), public domain.`;
+    openSheet(detailEl);
+  }
+
+  function openSheet(el) { el.hidden = false; }
+  function closeSheet(el) { el.hidden = true; }
+  document.querySelectorAll(".sheet .sheet-close").forEach(btn => {
+    btn.addEventListener("click", () => closeSheet(btn.closest(".sheet")));
+  });
+  document.querySelectorAll(".sheet").forEach(sheet => {
+    sheet.addEventListener("click", (e) => { if (e.target === sheet) closeSheet(sheet); });
+  });
+
+  // ---- Feed virtualization ----
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+        currentGi = parseInt(entry.target.dataset.gi, 10);
+        localStorage.setItem(LS_POSITION, String(currentGi));
+        maybeGrow();
+        maybeGrowBack();
+        maybePrune();
+        maybePruneForward();
+      }
+    });
+  }, { root: feedEl, threshold: [0.5] });
+
+  async function appendPage(gi) {
+    const el = await buildPage(gi);
+    feedEl.appendChild(el);
+    observer.observe(el);
+    rendered.push({ gi, el });
+  }
+
+  async function prependPage(gi) {
+    const el = await buildPage(gi);
+    const prevScrollTop = feedEl.scrollTop;
+    feedEl.insertBefore(el, feedEl.firstChild);
+    observer.observe(el);
+    rendered.unshift({ gi, el });
+    // compensate so the content the user was looking at doesn't jump
+    feedEl.scrollTop = prevScrollTop + el.getBoundingClientRect().height;
+  }
+
+  async function maybeGrow() {
+    if (loadingMore) return;
+    const last = rendered[rendered.length - 1];
+    if (!last) return;
+    if (last.gi - currentGi < 4) {
+      loadingMore = true;
+      const next = last.gi + 1;
+      await appendPage(next);
+      loadingMore = false;
+    }
+  }
+
+  async function maybeGrowBack() {
+    if (loadingMore) return;
+    const first = rendered[0];
+    if (!first) return;
+    if (currentGi - first.gi < 4) {
+      loadingMore = true;
+      const prev = first.gi - 1;
+      await prependPage(prev);
+      loadingMore = false;
+    }
+  }
+
+  function maybePrune() {
+    while (rendered.length > 14 && (currentGi - rendered[0].gi) > 8) {
+      const first = rendered.shift();
+      const h = first.el.getBoundingClientRect().height;
+      first.el.remove();
+      feedEl.scrollTop -= h;
+    }
+  }
+
+  function maybePruneForward() {
+    while (rendered.length > 14 && (rendered[rendered.length - 1].gi - currentGi) > 8) {
+      const last = rendered.pop();
+      last.el.remove();
+    }
+  }
+
+  async function seedFeed(startGi) {
+    feedEl.innerHTML = "";
+    rendered = [];
+    currentGi = startGi;
+    for (let i = -2; i <= 4; i++) {
+      await appendPage(startGi + i);
+    }
+    // scroll so startGi page is at top
+    const target = rendered.find(r => r.gi === startGi);
+    if (target) target.el.scrollIntoView({ block: "start" });
+  }
+
+  async function jumpToSurah(num) {
+    await loadSurah(num);
+    const prev = num === 1 ? 0 : cumulative[num - 2];
+    await seedFeed(prev); // first ayah of that surah
+    closeSheet(surahsEl);
+  }
+
+  async function jumpToVerse(surah, ayah) {
+    await loadSurah(surah);
+    await seedFeed(giFromSurahAyah(surah, ayah));
+    closeSheet(surahsEl);
+  }
+
+  // ---- Surah browser + full-text search ----
+  const surahListEl = document.getElementById("surah-list");
+  const surahResultsEl = document.getElementById("surah-results");
+  const surahSearchEl = document.getElementById("surah-search");
+  const moreTextsEl = document.getElementById("more-texts-block");
+
+  function filteredSurahMeta(q) {
+    if (!q) return surahMeta;
+    return surahMeta.filter((s) =>
+      s.nameEnglish.toLowerCase().includes(q) ||
+      s.meaning.toLowerCase().includes(q) ||
+      s.nameArabic.includes(q) ||
+      s.context.toLowerCase().includes(q) ||
+      String(s.number) === q
+    );
+  }
+
+  function renderSurahList(q) {
+    const list = filteredSurahMeta(q || "");
+    if (!list.length) {
+      surahListEl.innerHTML = `<p class="surah-empty">No surahs match.</p>`;
+      return;
+    }
+    surahListEl.innerHTML = "";
+    list.forEach(s => {
+      const row = document.createElement("button");
+      row.className = "surah-row";
+      row.innerHTML = `
+        <span class="surah-num">${s.number}</span>
+        <span class="surah-names">
+          <div class="surah-en">${escapeHtml(s.nameEnglish)} <span class="surah-meaning">· ${escapeHtml(s.meaning)}</span></div>
+        </span>
+        <span class="surah-ar">${s.nameArabic}</span>`;
+      row.addEventListener("click", () => jumpToSurah(s.number));
+      surahListEl.appendChild(row);
+    });
+  }
+
+  async function ensureAllSurahsLoaded() {
+    if (allSurahsLoaded) return;
+    if (!allSurahsLoading) {
+      allSurahsLoading = Promise.all(surahMeta.map(s => loadSurah(s.number))).then(() => {
+        allSurahsLoaded = true;
+      });
+    }
+    await allSurahsLoading;
+  }
+
+  function surahMatchHtml(s) {
+    return `
+      <button class="surah-result-item" data-surah="${s.number}" data-ayah="1">
+        <div class="surah-result-tag">Surah ${s.number}</div>
+        <p class="surah-result-text">${escapeHtml(s.nameEnglish)} &middot; ${escapeHtml(s.meaning)}</p>
+      </button>
+    `;
+  }
+
+  function verseMatchHtml(v) {
+    const info = surahInfo(v.surah);
+    return `
+      <button class="surah-result-item" data-surah="${v.surah}" data-ayah="${v.ayah}">
+        <div class="surah-result-tag">${escapeHtml(info.nameEnglish)} ${v.surah}:${v.ayah}</div>
+        <p class="surah-result-text">${escapeHtml(truncate(v.translation, 140))}</p>
+      </button>
+    `;
+  }
+
+  let searchToken = 0;
+
+  async function renderSearchResults(query) {
+    const token = ++searchToken;
+    const qLower = query.toLowerCase();
+    const surahMatches = filteredSurahMeta(qLower);
+
+    surahResultsEl.innerHTML =
+      (surahMatches.length ? surahMatches.map(surahMatchHtml).join("") : "") +
+      `<p class="surah-loading">Searching all 6,236 verses...</p>`;
+
+    await ensureAllSurahsLoaded();
+    if (token !== searchToken) return; // a newer search started while we were loading
+
+    const verseMatches = [];
+    outer:
+    for (const s of surahMeta) {
+      const verses = surahCache.get(s.number) || [];
+      for (const v of verses) {
+        if (
+          v.translation.toLowerCase().includes(qLower) ||
+          v.transliteration.toLowerCase().includes(qLower) ||
+          v.arabic.includes(query)
+        ) {
+          verseMatches.push(v);
+          if (verseMatches.length >= 40) break outer;
+        }
+      }
+    }
+
+    if (!surahMatches.length && !verseMatches.length) {
+      surahResultsEl.innerHTML = `<p class="surah-empty">No surahs or verses match "${escapeHtml(query)}".</p>`;
+      return;
+    }
+    surahResultsEl.innerHTML =
+      surahMatches.map(surahMatchHtml).join("") +
+      verseMatches.map(verseMatchHtml).join("");
+  }
+
+  function handleSurahSearchInput() {
+    const q = surahSearchEl.value.trim();
+    if (!q) {
+      surahResultsEl.hidden = true;
+      surahListEl.hidden = false;
+      if (moreTextsEl) moreTextsEl.hidden = false;
+      return;
+    }
+    surahListEl.hidden = true;
+    surahResultsEl.hidden = false;
+    if (moreTextsEl) moreTextsEl.hidden = true;
+    renderSearchResults(q);
+  }
+
+  surahSearchEl.addEventListener("input", handleSurahSearchInput);
+  surahResultsEl.addEventListener("click", (e) => {
+    const item = e.target.closest(".surah-result-item");
+    if (!item) return;
+    jumpToVerse(parseInt(item.dataset.surah, 10), parseInt(item.dataset.ayah, 10));
+  });
+
+  document.getElementById("btn-surahs").addEventListener("click", () => {
+    surahSearchEl.value = "";
+    surahResultsEl.hidden = true;
+    surahListEl.hidden = false;
+    if (moreTextsEl) moreTextsEl.hidden = false;
+    renderSurahList("");
+    openSheet(surahsEl);
+  });
+  document.getElementById("btn-info").addEventListener("click", () => openSheet(infoEl));
+
+  // ---- Onboarding ----
+  const ONBOARD_SLIDES = [
+    {
+      icon: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>`,
+      title: "The Quran, one verse at a time",
+      body: "Swipe through short verses, full screen, with nothing else competing for your attention."
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`,
+      title: "Tap to go deeper",
+      body: "Tap any verse to see the Arabic text, a transliteration, the full translation, and brief context."
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20s-7-4.4-9.5-9.1C.8 7.6 2.3 4 5.8 4c2 0 3.3 1 4.2 2.4C11 5 12.2 4 14.2 4c3.5 0 5 3.6 3.3 6.9C19 15.6 12 20 12 20z"/></svg>`,
+      title: "Save and share",
+      body: "Keep verses that speak to you, and share any verse — Arabic, translation and reference together."
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 11h1v5h1"/></svg>`,
+      title: "Real text, real sources",
+      body: "Arabic from the Tanzil Project, translation by M. M. Pickthall (1930, public domain) — both clearly credited throughout the app."
+    },
+  ];
+
+  function renderOnboarding() {
+    const slidesEl = document.getElementById("onboard-slides");
+    const dotsEl = document.getElementById("onboard-dots");
+    slidesEl.innerHTML = "";
+    dotsEl.innerHTML = "";
+    ONBOARD_SLIDES.forEach((s, i) => {
+      const slide = document.createElement("div");
+      slide.className = "onboard-slide";
+      slide.innerHTML = `<div class="mark">${s.icon}</div><h2>${s.title}</h2><p>${s.body}</p>`;
+      slidesEl.appendChild(slide);
+      const dot = document.createElement("span");
+      if (i === 0) dot.className = "on";
+      dotsEl.appendChild(dot);
+    });
+    slidesEl.addEventListener("scroll", () => {
+      const idx = Math.round(slidesEl.scrollLeft / slidesEl.clientWidth);
+      [...dotsEl.children].forEach((d, i) => d.classList.toggle("on", i === idx));
+      nextBtn.textContent = idx === ONBOARD_SLIDES.length - 1 ? "Start reading" : "Continue";
+    });
+  }
+
+  const onboardEl = document.getElementById("onboarding");
+  const nextBtn = document.getElementById("onboard-next");
+  nextBtn.addEventListener("click", () => {
+    const slidesEl = document.getElementById("onboard-slides");
+    const idx = Math.round(slidesEl.scrollLeft / slidesEl.clientWidth);
+    if (idx < ONBOARD_SLIDES.length - 1) {
+      slidesEl.scrollTo({ left: slidesEl.clientWidth * (idx + 1), behavior: "smooth" });
+    } else {
+      localStorage.setItem(LS_ONBOARDED, "1");
+      onboardEl.hidden = true;
+    }
+  });
+
+  // ---- Boot ----
+  async function boot() {
+    const [surahsRes, indexRes] = await Promise.all([
+      fetch("/data/surahs.json").then(r => r.json()),
+      fetch("/data/index.json").then(r => r.json()),
+    ]);
+    surahMeta = surahsRes;
+    totalVerses = indexRes.totalVerses;
+    let running = 0;
+    cumulative = indexRes.surahs.map(s => { running += s.count; return running; });
+
+    renderSurahList();
+    renderOnboarding();
+
+    const savedPos = parseInt(localStorage.getItem(LS_POSITION) || "0", 10);
+    await seedFeed(Number.isFinite(savedPos) ? savedPos : 0);
+
+    if (!localStorage.getItem(LS_ONBOARDED)) {
+      onboardEl.hidden = false;
+    }
+  }
+
+  boot();
+})();

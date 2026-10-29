@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Versling — Quran, one verse at a time</title>
+<meta name="description" content="A calm, full-screen way to read the Quran one verse at a time — Arabic text, transliteration, translation, and brief context, swipe by swipe." />
+<meta name="theme-color" content="#0a0a0a" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='5' fill='%230a0a0a'/><path d='M7 17V7l10 10V7' stroke='%23c9a227' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <header id="topbar">
+    <button id="btn-surahs" class="icon-btn" aria-label="Browse surahs" title="Browse surahs">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h11" stroke-linecap="round"/></svg>
+    </button>
+    <div id="brand">Versling</div>
+    <button id="btn-info" class="icon-btn" aria-label="About and sources" title="About and sources">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 11h1v5h1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <main id="feed" aria-live="polite"></main>
+
+  <template id="tpl-page">
+    <section class="verse-page">
+      <div class="verse-ref"></div>
+      <div class="verse-arabic" dir="rtl" lang="ar"></div>
+      <div class="verse-translation"></div>
+      <div class="verse-actions">
+        <button class="act act-like" aria-label="Save verse" title="Save verse">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20s-7-4.4-9.5-9.1C.8 7.6 2.3 4 5.8 4c2 0 3.3 1 4.2 2.4C11 5 12.2 4 14.2 4c3.5 0 5 3.6 3.3 6.9C19 15.6 12 20 12 20z" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="act act-expand" aria-label="Show detail" title="Show detail">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="act act-share" aria-label="Share verse" title="Share verse">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15V3m0 0L8 7m4-4l4 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="verse-hint">Tap for Arabic, transliteration and context</div>
+    </section>
+  </template>
+
+  <div id="detail" class="sheet" hidden>
+    <div class="sheet-inner">
+      <button class="sheet-close icon-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+      <div class="sheet-ref"></div>
+      <div class="sheet-surah"></div>
+      <div class="sheet-context"></div>
+      <h3 class="sheet-label">Arabic</h3>
+      <div class="sheet-arabic" dir="rtl" lang="ar"></div>
+      <h3 class="sheet-label">Transliteration</h3>
+      <div class="sheet-translit"></div>
+      <h3 class="sheet-label">Translation</h3>
+      <div class="sheet-translation"></div>
+      <div class="sheet-source"></div>
+    </div>
+  </div>
+
+  <div id="surahs" class="sheet" hidden>
+    <div class="sheet-inner">
+      <button class="sheet-close icon-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+      <h2 class="sheet-title">Surahs</h2>
+      <input id="surah-search" class="surah-search" type="text" placeholder="Search surahs or verses..." autocomplete="off" />
+      <div id="surah-results" class="surah-results" hidden></div>
+      <div id="surah-list"></div>
+      <div id="more-texts-block" class="more-texts">
+        <div class="divider"></div>
+        <div class="sheet-label">More sacred texts, same format</div>
+        <a class="more-texts-link" href="https://shloka.ereboslab.com" target="_blank" rel="noopener">
+          <span class="more-texts-name">Shloka</span>
+          <span class="more-texts-desc">The Bhagavad Gita, one shloka at a time</span>
+        </a>
+        <a class="more-texts-link" href="https://gatha.ereboslab.com" target="_blank" rel="noopener">
+          <span class="more-texts-name">Gatha</span>
+          <span class="more-texts-desc">The Dhammapada, one verse at a time</span>
+        </a>
+        <a class="more-texts-link" href="https://pasuk.ereboslab.com" target="_blank" rel="noopener">
+          <span class="more-texts-name">Pasuk</span>
+          <span class="more-texts-desc">The Torah, one verse at a time</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="info" class="sheet" hidden>
+    <div class="sheet-inner">
+      <button class="sheet-close icon-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+      <h2 class="sheet-title">About Versling</h2>
+      <p>Versling is an independent, original project for reading the Quran one verse at a time — built for a slow, full-screen moment instead of a feed built for distraction.</p>
+      <h3 class="sheet-label">Sources</h3>
+      <p><strong>Arabic text:</strong> Tanzil Project (Uthmani script), licensed under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">Creative Commons Attribution 3.0</a>. Unmodified. Source: <a href="https://tanzil.net" target="_blank" rel="noopener">tanzil.net</a>.</p>
+      <p><strong>Transliteration:</strong> Tanzil Project transliteration edition, via <a href="https://tanzil.net" target="_blank" rel="noopener">tanzil.net</a>.</p>
+      <p><strong>English translation:</strong> Mohammed Marmaduke Pickthall, <em>The Meaning of the Glorious Qur'an</em> (1930) — in the public domain (UK since 2007; US since January 1, 2026).</p>
+      <p><strong>Surah names, Arabic titles and revelation classification:</strong> standard bibliographic data about the Quran's structure.</p>
+      <p><strong>Context lines:</strong> short original summaries written for this app, not taken from any translation or commentary.</p>
+      <p class="muted">Versling is an independent reading tool. It is not affiliated with Tanzil.net, any translator, or any other Quran app.</p>
+    </div>
+  </div>
+
+  <div id="onboarding" class="onboard" hidden>
+    <div class="onboard-slides" id="onboard-slides"></div>
+    <div class="onboard-dots" id="onboard-dots"></div>
+    <button id="onboard-next" class="btn-primary">Continue</button>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
