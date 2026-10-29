@@ -92,6 +92,19 @@
     return s.length > n ? s.slice(0, n).trim() + "…" : s;
   }
 
+  // Strip Quranic diacritics (tashkeel/tanween/Quranic annotation marks) and
+  // normalize alef variants (آ أ إ ٱ -> ا) so Arabic search actually matches
+  // real-world input. The stored Arabic text (Tanzil Uthmani script) carries
+  // full diacritics on every letter, but a normal Arabic keyboard does not
+  // produce those marks — without this, a plain-typed query like "الله"
+  // never substring-matches the stored "اللَّهِ" and Arabic search is
+  // effectively always empty for real users.
+  function normalizeArabic(s) {
+    return String(s)
+      .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") // tashkeel/tanween/Quranic marks
+      .replace(/[\u0622\u0623\u0625\u0671]/g, "\u0627"); // alef variants -> plain alef
+  }
+
   async function loadSurah(num) {
     if (surahCache.has(num)) return surahCache.get(num);
     const res = await fetch(`/data/surah-${num}.json`);
@@ -298,10 +311,11 @@
 
   function filteredSurahMeta(q) {
     if (!q) return surahMeta;
+    const qArabic = normalizeArabic(q);
     return surahMeta.filter((s) =>
       s.nameEnglish.toLowerCase().includes(q) ||
       s.meaning.toLowerCase().includes(q) ||
-      s.nameArabic.includes(q) ||
+      normalizeArabic(s.nameArabic).includes(qArabic) ||
       s.context.toLowerCase().includes(q) ||
       String(s.number) === q
     );
@@ -372,6 +386,7 @@
     if (token !== searchToken) return; // a newer search started while we were loading
 
     const verseMatches = [];
+    const qArabic = normalizeArabic(query);
     outer:
     for (const s of surahMeta) {
       const verses = surahCache.get(s.number) || [];
@@ -379,7 +394,7 @@
         if (
           v.translation.toLowerCase().includes(qLower) ||
           v.transliteration.toLowerCase().includes(qLower) ||
-          v.arabic.includes(query)
+          normalizeArabic(v.arabic).includes(qArabic)
         ) {
           verseMatches.push(v);
           if (verseMatches.length >= 40) break outer;
