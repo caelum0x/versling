@@ -59,6 +59,28 @@
     return prev + (ayah - 1);
   }
 
+  // ---- Deep links: ?v=surah:ayah ----
+  function parseVerseRef(raw) {
+    if (!raw) return null;
+    const m = /^(\d{1,3}):(\d{1,3})$/.exec(raw.trim());
+    if (!m) return null;
+    const surah = parseInt(m[1], 10);
+    const ayah = parseInt(m[2], 10);
+    const info = surahInfo(surah);
+    if (!info || ayah < 1 || ayah > info.ayahCount) return null;
+    return { surah, ayah };
+  }
+
+  function verseUrl(surah, ayah) {
+    return `${location.origin}${location.pathname}?v=${surah}:${ayah}`;
+  }
+
+  function updateUrlForGi(gi) {
+    const { surah, ayah } = giToSurahAyah(gi);
+    const url = `${location.pathname}?v=${surah}:${ayah}`;
+    history.replaceState(null, "", url);
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -120,13 +142,14 @@
     el.querySelector(".act-share").addEventListener("click", async (e) => {
       e.stopPropagation();
       const info = surahInfo(verse.surah);
-      const text = `${verse.arabic}\n\n"${verse.translation}"\n— Quran ${info.nameEnglish} ${verse.surah}:${verse.ayah}\n\nvia Versling`;
+      const link = verseUrl(verse.surah, verse.ayah);
+      const text = `${verse.arabic}\n\n"${verse.translation}"\n— Quran ${info.nameEnglish} ${verse.surah}:${verse.ayah}\n\n${link}`;
       if (navigator.share) {
-        try { await navigator.share({ text }); } catch {}
+        try { await navigator.share({ text, url: link }); } catch {}
       } else {
         try {
           await navigator.clipboard.writeText(text);
-          toast("Copied to clipboard");
+          toast("Link copied");
         } catch { toast("Could not copy"); }
       }
     });
@@ -144,6 +167,18 @@
     detailEl.querySelector(".sheet-source").innerHTML =
       `Arabic: Tanzil Project, CC BY 3.0 — <a href="https://tanzil.net" target="_blank" rel="noopener">tanzil.net</a>. ` +
       `Translation: M. M. Pickthall (1930), public domain.`;
+    const copyBtn = detailEl.querySelector(".sheet-copy-link");
+    copyBtn.textContent = "Copy link";
+    copyBtn.classList.remove("copied");
+    copyBtn.onclick = async () => {
+      const link = verseUrl(verse.surah, verse.ayah);
+      try {
+        await navigator.clipboard.writeText(link);
+        copyBtn.textContent = "Copied";
+        copyBtn.classList.add("copied");
+        toast("Link copied");
+      } catch { toast("Could not copy"); }
+    };
     openSheet(detailEl);
   }
 
@@ -162,6 +197,7 @@
       if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
         currentGi = parseInt(entry.target.dataset.gi, 10);
         localStorage.setItem(LS_POSITION, String(currentGi));
+        updateUrlForGi(currentGi);
         maybeGrow();
         maybeGrowBack();
         maybePrune();
@@ -461,9 +497,20 @@
     renderSurahList();
     renderOnboarding();
 
-    const savedPos = parseInt(localStorage.getItem(LS_POSITION) || "0", 10);
-    await seedFeed(Number.isFinite(savedPos) ? savedPos : 0);
+    const sharedRef = parseVerseRef(new URLSearchParams(location.search).get("v"));
+    let startGi;
+    if (sharedRef) {
+      await loadSurah(sharedRef.surah);
+      startGi = giFromSurahAyah(sharedRef.surah, sharedRef.ayah);
+      toast(`Opened ${surahInfo(sharedRef.surah).nameEnglish} ${sharedRef.surah}:${sharedRef.ayah}`);
+    } else {
+      const savedPos = parseInt(localStorage.getItem(LS_POSITION) || "0", 10);
+      startGi = Number.isFinite(savedPos) ? savedPos : 0;
+    }
+    await seedFeed(startGi);
 
+    // a shared link should always show onboarding too, same as a fresh visit —
+    // don't let a deep link silently skip the explainer for a brand-new user
     if (!localStorage.getItem(LS_ONBOARDED)) {
       onboardEl.hidden = false;
     }

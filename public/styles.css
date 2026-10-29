@@ -86,7 +86,14 @@ a:hover{text-decoration:underline;}
 }
 @keyframes sheet-up{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 .sheet-close{position:absolute;top:14px;right:16px;}
-.sheet-ref{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-top:6px;}
+.sheet-ref{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+.sheet-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;}
+.sheet-copy-link{
+  background:transparent;border:1px solid var(--border);color:var(--text-dim);
+  font-size:11px;letter-spacing:.04em;border-radius:14px;padding:5px 11px;cursor:pointer;flex-shrink:0;
+}
+.sheet-copy-link:active{transform:scale(.96);}
+.sheet-copy-link.copied{color:var(--accent);border-color:var(--accent);}
 .sheet-surah{font-size:18px;font-weight:700;margin-top:4px;}
 .sheet-context{color:var(--text-dim);font-size:14px;margin:10px 0 18px;line-height:1.5;}
 .sheet-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin:18px 0 8px;font-weight:600;}
