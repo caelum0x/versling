@@ -42,6 +42,19 @@
   let rendered = [];          // array of { gi, el, surah, ayah }
   let currentGi = 0;
   let loadingMore = false;
+  // Bumped at the start of every seedFeed() call. jumpToSurah/jumpToVerse
+  // only close their sheet *after* seedFeed resolves, so the sheet (surah
+  // browser, search results, saved list) stays open and tappable for the
+  // whole, possibly multi-second, jump -- nothing stopped a second tap on a
+  // different row from calling seedFeed again while the first call's
+  // appendPage() awaits (a real surah-JSON network fetch) were still
+  // in-flight. Those stale awaits used to resolve straight into the *new*
+  // seedFeed's live `rendered`/feedEl (both read via closure, not a
+  // snapshot), interleaving pages from two unrelated jump targets into one
+  // scrambled feed. Each appendPage/prependPage call now carries the
+  // generation it was started under and silently no-ops if a newer
+  // seedFeed() has since started.
+  let seedGeneration = 0;
   let allSurahsLoaded = false;
   let allSurahsLoading = null;
 
@@ -340,15 +353,17 @@
     });
   }, { root: feedEl, threshold: [0.5] });
 
-  async function appendPage(gi) {
+  async function appendPage(gi, generation = seedGeneration) {
     const el = await buildPage(gi);
+    if (generation !== seedGeneration) return; // superseded by a newer seedFeed()
     feedEl.appendChild(el);
     observer.observe(el);
     rendered.push({ gi, el });
   }
 
-  async function prependPage(gi) {
+  async function prependPage(gi, generation = seedGeneration) {
     const el = await buildPage(gi);
+    if (generation !== seedGeneration) return; // superseded by a newer seedFeed()
     const prevScrollTop = feedEl.scrollTop;
     feedEl.insertBefore(el, feedEl.firstChild);
     observer.observe(el);
@@ -417,12 +432,15 @@
   }
 
   async function seedFeed(startGi) {
+    const myGeneration = ++seedGeneration;
     feedEl.innerHTML = "";
     rendered = [];
     currentGi = startGi;
     for (let i = -2; i <= 4; i++) {
-      await appendPage(startGi + i);
+      if (myGeneration !== seedGeneration) return; // superseded by a later jump
+      await appendPage(startGi + i, myGeneration);
     }
+    if (myGeneration !== seedGeneration) return; // superseded by a later jump
     // scroll so startGi page is at top
     const target = rendered.find(r => r.gi === startGi);
     if (target) target.el.scrollIntoView({ block: "start" });
