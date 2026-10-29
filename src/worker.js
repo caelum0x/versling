@@ -21,6 +21,12 @@ function truncate(s, n) {
   return s.length > n ? s.slice(0, n).trim() + "…" : s;
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
 async function fetchJson(env, url, pathname) {
   const assetUrl = new URL(pathname, url);
   const res = await env.ASSETS.fetch(new Request(assetUrl));
@@ -65,6 +71,19 @@ export default {
       const description = truncate(verse.translation, 180);
       const pageUrl = `${url.origin}${url.pathname}?v=${ref.surah}:${ref.ayah}`;
 
+      // Real server-rendered verse content, not just meta tags: the SPA only
+      // ever fills #feed from client JS, so a crawler (or any client with JS
+      // disabled/budget-limited) reading the raw HTML for one of the 6,236
+      // ?v= URLs the sitemap now lists would otherwise see an empty <main>
+      // with nothing to index — the title/description alone aren't page
+      // content. This injects the exact same verse text the client renders
+      // a moment later via seedFeed(), so there's something real to crawl.
+      const feedHtml = `<section class="verse-page" data-gi="ssr">
+        <div class="verse-ref">${escapeHtml(info.nameEnglish)} ${ref.surah}:${ref.ayah}</div>
+        <div class="verse-arabic" dir="rtl" lang="ar">${escapeHtml(verse.arabic)}</div>
+        <div class="verse-translation">${escapeHtml(verse.translation)}</div>
+      </section>`;
+
       const rewriter = new HTMLRewriter()
         .on("title", { element(el) { el.setInnerContent(title); } })
         .on('meta[name="description"]', { element(el) { el.setAttribute("content", description); } })
@@ -72,7 +91,8 @@ export default {
         .on('meta[property="og:description"]', { element(el) { el.setAttribute("content", description); } })
         .on('meta[property="og:url"]', { element(el) { el.setAttribute("content", pageUrl); } })
         .on('meta[name="twitter:title"]', { element(el) { el.setAttribute("content", title); } })
-        .on('meta[name="twitter:description"]', { element(el) { el.setAttribute("content", description); } });
+        .on('meta[name="twitter:description"]', { element(el) { el.setAttribute("content", description); } })
+        .on("main#feed", { element(el) { el.setInnerContent(feedHtml, { html: true }); } });
 
       return rewriter.transform(pageRes);
     } catch {
