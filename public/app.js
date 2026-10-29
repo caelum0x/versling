@@ -637,6 +637,23 @@
     openSheet(savedEl);
   });
 
+  // Picks up likes written by another tab/window of this same app (e.g. a
+  // verse saved in one open tab) so this tab's heart buttons and open Saved
+  // sheet never show a stale snapshot. The read/write itself was already
+  // confirmed race-free (fresh getLikes() on every write, no module-level
+  // cache) — this only closes the separate UI-sync gap: without it, a
+  // second open tab needed a manual reload to see the other tab's change.
+  // Same pattern as Shloka's own "storage" listener (public/app.js).
+  window.addEventListener("storage", (e) => {
+    if (e.key !== LS_LIKES) return;
+    const likes = getLikes();
+    rendered.forEach((r) => {
+      const key = `${r.el.dataset.surah}:${r.el.dataset.ayah}`;
+      setLikeBtnState(r.el.querySelector(".act-like"), likes.has(key));
+    });
+    if (!savedEl.hidden) renderSavedList();
+  });
+
   // ---- Onboarding ----
   const ONBOARD_SLIDES = [
     {
