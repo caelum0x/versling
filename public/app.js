@@ -464,7 +464,7 @@
         <span class="surah-names">
           <div class="surah-en">${escapeHtml(s.nameEnglish)} <span class="surah-meaning">· ${escapeHtml(s.meaning)}</span></div>
         </span>
-        <span class="surah-ar">${s.nameArabic}</span>`;
+        <span class="surah-ar">${escapeHtml(s.nameArabic)}</span>`;
       row.addEventListener("click", () => jumpToSurah(s.number));
       surahListEl.appendChild(row);
     });
