@@ -50,7 +50,7 @@
       <div class="verse-arabic" dir="rtl" lang="ar"></div>
       <div class="verse-translation"></div>
       <div class="verse-actions">
-        <button class="act act-like" aria-label="Save verse" title="Save verse">
+        <button class="act act-like" aria-label="Save verse" aria-pressed="false" title="Save verse">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20s-7-4.4-9.5-9.1C.8 7.6 2.3 4 5.8 4c2 0 3.3 1 4.2 2.4C11 5 12.2 4 14.2 4c3.5 0 5 3.6 3.3 6.9C19 15.6 12 20 12 20z" stroke-linejoin="round"/></svg>
         </button>
         <button class="act act-expand" aria-label="Show detail" title="Show detail">
@@ -146,7 +146,7 @@
     <button id="onboard-next" class="btn-primary">Continue</button>
   </div>
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
 <script src="/app.js"></script>

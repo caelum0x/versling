@@ -135,7 +135,18 @@
     el.querySelector(".verse-translation").textContent = verse.translation;
     const likeBtn = el.querySelector(".act-like");
     const likes = getLikes();
-    likeBtn.classList.toggle("active", likes.has(`${verse.surah}:${verse.ayah}`));
+    setLikeBtnState(likeBtn, likes.has(`${verse.surah}:${verse.ayah}`));
+  }
+
+  // Keeps the visual `.active` class and the real `aria-pressed` state in
+  // sync. Before this, the heart/"Save verse" toggle only ever changed a CSS
+  // class — a screen reader user got no indication a verse was saved (or
+  // already saved) at all, since aria-pressed was never set on a real toggle
+  // button. Confirmed live: pre-fix, aria-pressed stayed `null` before and
+  // after clicking, even though the toast said "Saved" and the class toggled.
+  function setLikeBtnState(btn, isSaved) {
+    btn.classList.toggle("active", isSaved);
+    btn.setAttribute("aria-pressed", String(isSaved));
   }
 
   async function buildPage(gi) {
@@ -154,9 +165,9 @@
       e.stopPropagation();
       const key = `${verse.surah}:${verse.ayah}`;
       const likes = getLikes();
-      if (likes.has(key)) { likes.delete(key); } else { likes.add(key); toast("Saved"); }
+      if (likes.has(key)) { likes.delete(key); toast("Removed from saved"); } else { likes.add(key); toast("Saved"); }
       saveLikes(likes);
-      e.currentTarget.classList.toggle("active", likes.has(key));
+      setLikeBtnState(e.currentTarget, likes.has(key));
     });
     el.querySelector(".act-expand").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -592,7 +603,7 @@
       saveLikes(likes);
       rendered.forEach((r) => {
         if (parseInt(r.el.dataset.surah, 10) === surah && parseInt(r.el.dataset.ayah, 10) === ayah) {
-          r.el.querySelector(".act-like").classList.remove("active");
+          setLikeBtnState(r.el.querySelector(".act-like"), false);
         }
       });
       renderSavedList();
