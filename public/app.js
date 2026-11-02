@@ -229,7 +229,50 @@
         } catch { toast("Could not copy"); }
       }
     });
+    el.querySelector(".act-card").addEventListener("click", (e) => {
+      e.stopPropagation();
+      shareVerseImage(verse);
+    });
     el.addEventListener("click", () => openDetail(verse));
+  }
+
+  // Generates a real shareable verse-image card (Arabic + translation +
+  // the Versling mark) client-side on a canvas, via the shared
+  // `cardshare.js` module (same mechanism ported into shloka/gatha/pasuk),
+  // then shares it through the Web Share API with the file attached, or
+  // downloads it if the device/browser doesn't support sharing files.
+  // Arabic renders right-to-left, same as the app's own verse display.
+  async function shareVerseImage(verse) {
+    if (!window.VerseCard) return;
+    const info = surahInfo(verse.surah);
+    toast("Creating image…");
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      const canvas = window.VerseCard.renderVerseCard({
+        originalText: verse.arabic,
+        originalFont: "700 50px Amiri, serif",
+        originalDir: "rtl",
+        translation: verse.translation,
+        reference: `Quran ${info.nameEnglish} ${verse.surah}:${verse.ayah}`,
+        chapterLabel: `Surah ${info.nameEnglish} · ${verse.surah}:${verse.ayah}`,
+        appName: "Versling",
+        mark: "",
+        domain: "versling.subasiarhan3.workers.dev",
+        bg: "#0a0a0a",
+        fg: "#f3f1ea",
+        fgDim: "#9a9690",
+        accent: "#c9a227",
+      });
+      const result = await window.VerseCard.shareCardImage(canvas, {
+        filename: `versling-${verse.surah}-${verse.ayah}.png`,
+        shareText: `"${verse.translation}" — Quran ${info.nameEnglish} ${verse.surah}:${verse.ayah}\n${verseUrl(verse.surah, verse.ayah)}`,
+        shareTitle: "Versling",
+      });
+      if (result === "shared") toast("Shared");
+      else if (result === "downloaded") toast("Image saved");
+    } catch (e) {
+      toast("Could not create image");
+    }
   }
 
   function openDetail(verse) {

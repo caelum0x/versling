@@ -4,13 +4,14 @@
 //
 // Bump CACHE_VERSION whenever a cached file's content changes so old
 // caches get cleaned up and clients pick up the new files.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `versling-${CACHE_VERSION}`;
 
 const SHELL_URLS = [
   "/",
   "/index.html",
   "/app.js",
+  "/cardshare.js",
   "/styles.css",
   "/manifest.json",
   "/icon-192.png",
