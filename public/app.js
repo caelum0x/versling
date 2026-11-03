@@ -4,6 +4,7 @@
   const LS_ONBOARDED = "versling_onboarded_v1";
   const LS_POSITION = "versling_position_v1";
   const LS_LIKES = "versling_likes_v1";
+  const LS_TEXT_SCALE = "versling_textscale_v1";
 
   // localStorage.setItem/getItem can throw for real reasons that have
   // nothing to do with this app's logic: Safari private-mode quota, an
@@ -24,6 +25,38 @@
     catch { return false; }
   }
 
+  // ---- Adjustable reading text size ----
+  // Sibling reading apps in this portfolio (Ayah, Shloka) shipped a
+  // discrete "Aa" text-size control; Versling never had one -- every
+  // Arabic/transliteration/translation size was a fixed clamp(). This
+  // ports the same 5-step pattern (85/100/115/130/145%), applied here via
+  // a single `--text-scale` CSS custom property on <html> that the
+  // reading-content rules in styles.css multiply into their font-size, so
+  // one variable update (no DOM re-render) rescales both the live feed and
+  // the open detail sheet instantly.
+  const TEXT_SCALE_STEPS = [0.85, 1, 1.15, 1.3, 1.45];
+  const DEFAULT_TEXT_SCALE_INDEX = 1; // 100%
+
+  function loadTextScaleIndex() {
+    const stored = parseFloat(lsGet(LS_TEXT_SCALE));
+    const idx = TEXT_SCALE_STEPS.indexOf(stored);
+    return idx === -1 ? DEFAULT_TEXT_SCALE_INDEX : idx;
+  }
+
+  let textScaleIndex = loadTextScaleIndex();
+
+  function applyTextScale() {
+    document.documentElement.style.setProperty(
+      "--text-scale",
+      String(TEXT_SCALE_STEPS[textScaleIndex])
+    );
+  }
+
+  // Applied immediately, before boot()/first render, so there's no flash
+  // of 100%-sized text on a return visit that previously chose a
+  // different size.
+  applyTextScale();
+
   const topbarEl = document.getElementById("topbar");
   const feedEl = document.getElementById("feed");
   const pageTpl = document.getElementById("tpl-page");
@@ -34,6 +67,7 @@
   const savedListEl = document.getElementById("saved-list");
   const infoEl = document.getElementById("info");
   const toastEl = document.getElementById("toast");
+  const textSizeBtn = document.getElementById("btn-textsize");
 
   let surahMeta = [];        // from surahs.json
   let cumulative = [];       // cumulative verse counts, cumulative[i] = verses before surah i+1
@@ -660,6 +694,22 @@
     openSheet(surahsEl);
   });
   document.getElementById("btn-info").addEventListener("click", () => openSheet(infoEl));
+
+  // ---- Text size control ----
+  function updateTextSizeLabel() {
+    const pct = Math.round(TEXT_SCALE_STEPS[textScaleIndex] * 100);
+    textSizeBtn.setAttribute("aria-label", `Text size, ${pct}%, tap to change`);
+    textSizeBtn.title = `Text size: ${pct}%`;
+  }
+  updateTextSizeLabel();
+
+  textSizeBtn.addEventListener("click", () => {
+    textScaleIndex = (textScaleIndex + 1) % TEXT_SCALE_STEPS.length;
+    applyTextScale();
+    lsSet(LS_TEXT_SCALE, String(TEXT_SCALE_STEPS[textScaleIndex]));
+    updateTextSizeLabel();
+    toast(`Text size: ${Math.round(TEXT_SCALE_STEPS[textScaleIndex] * 100)}%`);
+  });
 
   // ---- Saved verses ----
   function savedItemHtml(p, v, info) {
